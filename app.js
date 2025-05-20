@@ -134,18 +134,22 @@ function chunkText(text, chunkSize = 1000) {
   return chunks;
 }
 
-async function storeDocument(content, source) {
-  const embeddings = new OpenAIEmbeddings();
-  const embedding = await embeddings.embedQuery(content);
-
-  await pool.query(
-    "INSERT INTO documents (content, embedding, source) VALUES ($1, $2, $3)",
-    [content, embedding, source]
-  );
-}
+const storeDocumentChunk = async (content, source) => {
+  try {
+    const embedding = await createDeepSeekEmbedding(content);
+    
+    await pool.query(
+      'INSERT INTO documents (content, embedding, source) VALUES ($1, $2, $3)',
+      [content, embedding, source]
+    );
+  } catch (error) {
+    console.error('Storage error:', error);
+    throw error;
+  }
+};
 
 async function getRelevantContext(question) {
-  const embeddings = new OpenAIEmbeddings();
+  const embeddings = new DeepSeekEmbeddings();
   const queryEmbedding = await embeddings.embedQuery(question);
 
   const { rows } = await pool.query(
