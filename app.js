@@ -1,11 +1,12 @@
 import express from "express";
 import {Pool} from "pg";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-//const { GoogleGenerativeAI } = require("@google/generative-ai");
 import { OpenAI } from "openai";
-// const { OpenAIEmbeddings } = require("@langchain/openai");
+import { OpenAIEmbeddings } from "@langchain/openai";
 import cors from "cors";
 import "dotenv/config";
+import PDFParser from "pdf2json";
+
 
 const app = express();
 app.use(cors());
@@ -44,6 +45,38 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const openai = new OpenAI();
 
 // PDF Processing
+// funct to extract text from pdf
+// funct to extract text from pdf
+async function extractTextFromPDF(dataBuffer) {
+  return new Promise((resolve, reject) => {
+    const pdfParser = new PDFParser();
+    let text = "";
+
+    pdfParser.on("pdfParser_dataError", (err) => reject(err));
+    pdfParser.on("pdfParser_dataReady", () => resolve(text));
+
+    pdfParser.on("pdfParser_data", (data) => {
+      try {
+        text = data.Pages.map((page) =>
+          page.Texts.map((text) =>
+            text.R.map((r) => decodeURIComponent(r.T)).join(" ")
+          ).join("\n")
+        ).join("\n");
+
+        // text clean up
+        text = text
+          .replace(/\s+/g, " ") // Collapse whitespace
+          .replace(/([a-z])([A-Z])/g, "$1 $2") // Fix missing spaces between words
+          .replace(/ /g, "") // Remove replacement characters
+          .trim();
+      } catch (error) {
+        reject(error);
+      }
+    }); 
+
+    pdfParser.parseBuffer(dataBuffer);
+  });
+}
 
 // Routes
 app.post("/ingest", async (req, res) => {
@@ -56,12 +89,12 @@ app.post("/ingest", async (req, res) => {
     // Debug: log buffer length
     console.log("PDF buffer length:", dataBuffer.length);
 
-    // Dynamically import pdf-parse to avoid ESM import issues
-    const pdf = (await import("pdf-parse")).default;
-    const text = await pdf(dataBuffer);
-console.log("Passed pdf-parse");
+    // Use extractTextFromPDF instead of pdf-parse
+    const text = await extractTextFromPDF(dataBuffer);
+    console.log("Extracted text from PDF");
+
     // Split into chunks
-    const chunks = chunkText(text.text);
+    const chunks = chunkText(text);
 
     // Store chunks with embeddings
     for (const chunk of chunks) {
