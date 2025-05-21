@@ -1,12 +1,15 @@
 import express from "express";
-import {Pool} from "pg";
+import { Pool } from "pg";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { OpenAI } from "openai";
 import { OpenAIEmbeddings } from "@langchain/openai";
 import cors from "cors";
 import "dotenv/config";
 import PDFParser from "pdf2json";
+<<<<<<< HEAD
 
+=======
+>>>>>>> aa7300e73d7ef5203bf7dba4f6026160df462212
 
 const app = express();
 app.use(cors());
@@ -78,6 +81,38 @@ async function extractTextFromPDF(dataBuffer) {
   });
 }
 
+// funct to extract text from pdf
+async function extractTextFromPDF(dataBuffer) {
+  return new Promise((resolve, reject) => {
+    const pdfParser = new PDFParser();
+    let text = "";
+
+    pdfParser.on("pdfParser_dataError", (err) => reject(err));
+    pdfParser.on("pdfParser_dataReady", () => resolve(text));
+
+    pdfParser.on("pdfParser_data", (data) => {
+      try {
+        text = data.Pages.map((page) =>
+          page.Texts.map((text) =>
+            text.R.map((r) => decodeURIComponent(r.T)).join(" ")
+          ).join("\n")
+        ).join("\n");
+
+        // text clean up
+        text = text
+          .replace(/\s+/g, " ") // Collapse whitespace
+          .replace(/([a-z])([A-Z])/g, "$1 $2") // Fix missing spaces between words
+          .replace(/�/g, "") // Remove replacement characters
+          .trim();
+      } catch (error) {
+        reject(error);
+      }
+    }); 
+
+    pdfParser.parseBuffer(dataBuffer);
+  });
+}
+
 // Routes
 app.post("/ingest", async (req, res) => {
   try {
@@ -89,10 +124,16 @@ app.post("/ingest", async (req, res) => {
     // Debug: log buffer length
     console.log("PDF buffer length:", dataBuffer.length);
 
+<<<<<<< HEAD
     // Use extractTextFromPDF instead of pdf-parse
     const text = await extractTextFromPDF(dataBuffer);
     console.log("Extracted text from PDF");
 
+=======
+    // Dynamically import pdf-parse to avoid ESM import issues
+    const text = await extractTextFromPDF(dataBuffer);
+    console.log("Passed pdf-parse");
+>>>>>>> aa7300e73d7ef5203bf7dba4f6026160df462212
     // Split into chunks
     const chunks = chunkText(text);
 
@@ -134,6 +175,7 @@ function chunkText(text, chunkSize = 1000) {
   return chunks;
 }
 
+<<<<<<< HEAD
 const storeDocumentChunk = async (content, source) => {
   try {
     const embedding = await createDeepSeekEmbedding(content);
@@ -150,6 +192,27 @@ const storeDocumentChunk = async (content, source) => {
 
 async function getRelevantContext(question) {
   const embeddings = new DeepSeekEmbeddings();
+=======
+async function storeDocument(content, source) {
+  
+// replace this
+  const embeddings = new OpenAIEmbeddings();
+
+//   with this
+  const embedding = await embeddings.embedQuery(content);
+
+  await pool.query(
+    "INSERT INTO documents (content, embedding, source) VALUES ($1, $2, $3)",
+    [content, embedding, source]
+  );
+}
+
+async function getRelevantContext(question) {
+
+//   with this
+  const embeddings = new createDeepSeekEmbedding ();
+
+>>>>>>> aa7300e73d7ef5203bf7dba4f6026160df462212
   const queryEmbedding = await embeddings.embedQuery(question);
 
   const { rows } = await pool.query(
